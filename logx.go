@@ -48,6 +48,13 @@ func Fatal(v ...interface{}) {
 	os.Exit(1)
 }
 
+func Println(v ...interface{}) {
+	l.Println(v...)
+}
+func Print(v ...interface{}) {
+	l.Print(v...)
+}
+
 func Printf(format string, args ...interface{}) {
 	payload := fmt.Sprintf(format, args...)
 	payload = strings.TrimRight(payload, "\n")
