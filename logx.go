@@ -2,6 +2,7 @@ package logx
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -29,6 +30,9 @@ func Get() *log.Logger {
 	return l
 }
 
+func SetOutput(w io.Writer) {
+	l.SetOutput(w)
+}
 func Enable() {
 	l.SetOutput(os.Stdout)
 }
