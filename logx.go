@@ -114,6 +114,9 @@ func StackLine(levelUp, numTrailingDirs int) (int, string) {
 	return line, LastXDirs(file, numTrailingDirs)
 }
 
+// lvlInit usually one callee up: 1
+// Often we want to know the last 4 callees: lvlsUp = 3
+// numLastDirs: How many trailing dirs are shown.
 func StackTrace(lvlInit, lvlsUp, numLastDirs int) []string {
 	ret := make([]string, lvlsUp)
 	for i := 0; i < lvlsUp; i++ {
