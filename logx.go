@@ -1,6 +1,7 @@
 package logx
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/kataras/iris"
 )
 
 const NumLastDirs = 2 // how many directories to display
@@ -25,7 +28,7 @@ func init() {
 	l.SetFlags(0)
 }
 
-// For giving tracing
+// For giving it to a tracer
 func Get() *log.Logger {
 	return l
 }
@@ -91,6 +94,9 @@ func Columnify(arg string, minWidth, colWidth int) string {
 	return arg
 }
 
+// We dont want 20 leading directories of a source file.
+// But the filename alone is not enough.
+// "main.go" does not help.
 func LastXDirs(path string, numTrailingDirs int) string {
 
 	rump := path // init
@@ -128,4 +134,29 @@ func StackTrace(lvlInit, lvlsUp, numLastDirs int) []string {
 		ret[i] = Columnify(ret[i], 12, 12)
 	}
 	return ret
+}
+
+//
+// Under heavy load - with concurrent requests
+// the youngest request captures all log messages.
+func LogToResponseBody(c *iris.Context) {
+
+	// file, err := os.Create("./01.log")
+	file, err := os.OpenFile("./01.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		panic("could not open log file")
+	}
+
+	if false {
+		wtr := bytes.NewBufferString("init")
+		c.WriteString(wtr.String())
+	}
+
+	bodyWtr := io.Writer(c.RequestCtx.Response.BodyWriter())
+	multi := io.MultiWriter(file, os.Stdout, bodyWtr)
+	multi = io.MultiWriter(file, os.Stdout)
+	SetOutput(multi)
+
+	c.Next()
+
 }
