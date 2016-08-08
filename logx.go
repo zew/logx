@@ -45,12 +45,14 @@ func Disable() {
 
 func Fatalf(format string, v ...interface{}) {
 	defer SL().Incr().Decr()
+	SL().AppendStacktrace()
 	Printf(format, v...)
 	os.Exit(1)
 }
 
 func Fatal(v ...interface{}) {
 	defer SL().Incr().Decr()
+	SL().AppendStacktrace()
 	l.Print(v...)
 	os.Exit(1)
 }
