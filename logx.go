@@ -71,7 +71,8 @@ func Printf(format string, args ...interface{}) {
 
 	line := fmt.Sprintf("%s%s", logPrefix(), payload)
 	if sl.appendStacktrace {
-		linesUp := strings.Join(StackTrace(3, 3, 1), "\t")
+		linesUp := strings.Join(StackTrace(3, 3, 1), "\n\t")
+		linesUp = fmt.Sprintf("\n\t%v\n", linesUp)
 		line = fmt.Sprintf("%s%s", line, linesUp)
 	}
 	l.Print(line)
