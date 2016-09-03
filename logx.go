@@ -19,7 +19,7 @@ const NumLastDirs = 2 // how many directories to display
 const ColWidth = 6 // default column width
 const minCX = 2    // minimum spaces towards next columns
 
-var l = log.New(os.Stdout, "lx", log.Lshortfile)
+var l = log.New(os.Stdout, "lx ", log.Lshortfile)
 
 func init() {
 	// l := log.New(os.Stdout, "lx", log.Lshortfile)
