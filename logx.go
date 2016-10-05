@@ -1,7 +1,6 @@
 package logx
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,8 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/kataras/iris"
 )
 
 const NumLastDirs = 2 // how many directories to display
@@ -142,24 +139,25 @@ func StackTrace(lvlInit, lvlsUp, numLastDirs int) []string {
 //
 // Under heavy load - with concurrent requests
 // the youngest request captures all log messages.
-func LogToResponseBody(c *iris.Context) {
 
-	// file, err := os.Create("./01.log")
-	file, err := os.OpenFile("./01.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-	if err != nil {
-		panic("could not open log file")
-	}
+// func LogToResponseBody(c *iris.Context) {
 
-	if false {
-		wtr := bytes.NewBufferString("init")
-		c.WriteString(wtr.String())
-	}
+// 	// file, err := os.Create("./01.log")
+// 	file, err := os.OpenFile("./01.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+// 	if err != nil {
+// 		panic("could not open log file")
+// 	}
 
-	bodyWtr := io.Writer(c.RequestCtx.Response.BodyWriter())
-	multi := io.MultiWriter(file, os.Stdout, bodyWtr)
-	multi = io.MultiWriter(file, os.Stdout)
-	SetOutput(multi)
+// 	if false {
+// 		wtr := bytes.NewBufferString("init")
+// 		c.WriteString(wtr.String())
+// 	}
 
-	c.Next()
+// 	bodyWtr := io.Writer(c.RequestCtx.Response.BodyWriter())
+// 	multi := io.MultiWriter(file, os.Stdout, bodyWtr)
+// 	multi = io.MultiWriter(file, os.Stdout)
+// 	SetOutput(multi)
 
-}
+// 	c.Next()
+
+// }
