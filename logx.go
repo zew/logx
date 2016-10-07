@@ -136,6 +136,32 @@ func StackTrace(lvlInit, lvlsUp, numLastDirs int) []string {
 	return ret
 }
 
+func StackTraceStr() string {
+
+	var (
+		lvlInit         = 2 // one for this func, one since direct caller is already logges in prefix
+		lvlsUp          = 4
+		numTrailingDirs = 2
+	)
+
+	lines := make([]string, lvlsUp)
+	for i := 0; i < lvlsUp; i++ {
+
+		_, file, line, _ := runtime.Caller(i + lvlInit)
+		if line == 0 && file == "." {
+			break
+		}
+		file = LastXDirs(file, numTrailingDirs)
+
+		lines[i] = fmt.Sprintf("%s:%d", file, line)
+		lines[i] = Columnify(lines[i], 12, 12)
+	}
+
+	linesStr := strings.Join(lines, "\n\t")
+	linesStr = fmt.Sprintf("\n\t%v", linesStr)
+	return linesStr
+}
+
 //
 // Under heavy load - with concurrent requests
 // the youngest request captures all log messages.
