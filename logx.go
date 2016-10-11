@@ -136,13 +136,17 @@ func StackTrace(lvlInit, lvlsUp, numLastDirs int) []string {
 	return ret
 }
 
-func StackTraceStr() string {
+func StackTraceStr(arg ...int) string {
 
 	var (
 		lvlInit         = 2 // one for this func, one since direct caller is already logges in prefix
 		lvlsUp          = 4
 		numTrailingDirs = 2
 	)
+
+	if len(arg) > 0 {
+		lvlInit = arg[0]
+	}
 
 	lines := make([]string, lvlsUp)
 	for i := 0; i < lvlsUp; i++ {
