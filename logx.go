@@ -43,15 +43,21 @@ func Disable() {
 func Fatalf(format string, v ...interface{}) {
 	defer SL().Incr().Decr()
 	SL().AppendStacktrace()
-	Printf(format, v...)
-	os.Exit(1)
+	msg := fmt.Sprintf(format, v...)
+	l.Print(msg)
+	panic(msg) // Hand the panic up to outer panic handler
+	// Printf(format, v...)
+	// os.Exit(1)
 }
 
 func Fatal(v ...interface{}) {
 	defer SL().Incr().Decr()
 	SL().AppendStacktrace()
-	l.Print(v...)
-	os.Exit(1)
+	msg := fmt.Sprint(v...)
+	l.Print(msg)
+	panic(msg) // Hand the panic up to outer panic handler
+	// l.Print(v...)
+	// os.Exit(1)
 }
 
 func Println(v ...interface{}) {
@@ -136,16 +142,27 @@ func StackTrace(lvlInit, lvlsUp, numLastDirs int) []string {
 	return ret
 }
 
-func StackTraceStr(arg ...int) string {
+//
+func PrintStackTrace(args ...int) {
+	str := StackTraceStr(args...)
+	Printf(str)
+}
+
+// First  argument => level init
+// Second argument => levels up
+func StackTraceStr(args ...int) string {
 
 	var (
-		lvlInit         = 2 // one for this func, one since direct caller is already logges in prefix
+		lvlInit         = 2 // one for this func, one since direct caller is already logged in prefix
 		lvlsUp          = 4
 		numTrailingDirs = 2
 	)
 
-	if len(arg) > 0 {
-		lvlInit = arg[0]
+	if len(args) > 0 && args[0] > 0 {
+		lvlInit = args[0]
+	}
+	if len(args) > 1 {
+		lvlsUp = args[1]
 	}
 
 	lines := make([]string, lvlsUp)
