@@ -5,89 +5,30 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
-const NumLastDirs = 2 // how many directories to display
+const leadingDirsInPrefix = 2 // how many directories to display in prefix
 
 const ColWidth = 6 // default column width
-const minCX = 2    // minimum spaces towards next columns
 
-var l = log.New(os.Stdout, "lx ", log.Lshortfile)
+// var l = log.New(os.Stdout, "lx ", log.Lshortfile)
+var l = log.New(os.Stdout, "", log.Lshortfile)
 
 func init() {
-	// l := log.New(os.Stdout, "lx", log.Lshortfile)
 	l.SetFlags(log.Ltime | log.Lshortfile)
 	l.SetFlags(log.Lshortfile)
 	l.SetFlags(0)
 }
 
-// For giving it to a tracer
-func Get() *log.Logger {
-	return l
-}
+const minCX = 2 // minimum spaces towards next columns
 
-func SetOutput(w io.Writer) {
-	l.SetOutput(w)
-}
-func Enable() {
-	l.SetOutput(os.Stdout)
-}
-func Disable() {
-	l.SetOutput(ioutil.Discard)
-}
-
-func Fatalf(format string, v ...interface{}) {
-	defer SL().Incr().Decr()
-	SL().AppendStacktrace()
-	msg := fmt.Sprintf(format, v...)
-	l.Print(msg)
-	panic(msg) // Hand the panic up to outer panic handler
-	// Printf(format, v...)
-	// os.Exit(1)
-}
-
-func Fatal(v ...interface{}) {
-	defer SL().Incr().Decr()
-	SL().AppendStacktrace()
-	msg := fmt.Sprint(v...)
-	l.Print(msg)
-	panic(msg) // Hand the panic up to outer panic handler
-	// l.Print(v...)
-	// os.Exit(1)
-}
-
-func Println(v ...interface{}) {
-	l.Println(v...)
-}
-func Print(v ...interface{}) {
-	l.Print(v...)
-}
-
-func Printf(format string, args ...interface{}) {
-	payload := fmt.Sprintf(format, args...)
-	payload = strings.TrimRight(payload, "\n")
-	payload = Columnify(payload, 56, 4)
-
-	line := fmt.Sprintf("%s%s", logPrefix(), payload)
-	if sl.appendStacktrace {
-		linesUp := strings.Join(StackTrace(3, 3, 1), "\n\t")
-		linesUp = fmt.Sprintf("\n\t%v\n", linesUp)
-		line = fmt.Sprintf("%s%s", line, linesUp)
-	}
-	l.Print(line)
-}
-
-func logPrefix() string {
-	line, file := StackLine(sl.lvl, NumLastDirs)
-	prfx := fmt.Sprintf("%s:%d", file, line)
-	prfx = Columnify(prfx, 8, ColWidth)
-	return prfx
-}
-
+// Should go to package util strings -
+// but that causes import cycles
 func Columnify(arg string, minWidth, colWidth int) string {
 	if len(arg) < minWidth {
 		padd := minWidth + minCX - len(arg)
@@ -103,66 +44,119 @@ func Columnify(arg string, minWidth, colWidth int) string {
 // We dont want 20 leading directories of a source file.
 // But the filename alone is not enough.
 // "main.go" does not help.
-func LastXDirs(path string, numTrailingDirs int) string {
-
+func leadDirsBeforeSourceFile(path string, dirsBeforeSourceFile int) string {
 	rump := path // init
-	dirs := make([]string, 0, numTrailingDirs)
-
-	for i := 0; i < numTrailingDirs; i++ {
+	dirs := make([]string, 0, dirsBeforeSourceFile)
+	for i := 0; i < dirsBeforeSourceFile; i++ {
 		rump = filepath.Dir(rump)
 		dir := filepath.Base(rump)
 		dirs = append([]string{dir}, dirs...)
 	}
-
 	lastDirs := filepath.Join(dirs...)
 	lastDirs = filepath.Join(lastDirs, filepath.Base(path))
-
 	return lastDirs
-
 }
 
-func StackLine(levelUp, numTrailingDirs int) (int, string) {
+// Source code location
+// x steps up the call stack
+func stackLine(levelUp, dirsBeforeSourceFile int) (int, string) {
 	_, file, line, _ := runtime.Caller(levelUp + 1) // plus one for myself-func
-	return line, LastXDirs(file, numTrailingDirs)
+	return line, leadDirsBeforeSourceFile(file, dirsBeforeSourceFile)
 }
 
-// lvlInit usually one callee up: 1
-// Often we want to know the last 4 callees: lvlsUp = 3
-// numLastDirs: How many trailing dirs are shown.
-func StackTrace(lvlInit, lvlsUp, numLastDirs int) []string {
-	ret := make([]string, lvlsUp)
-	for i := 0; i < lvlsUp; i++ {
-		line, file := StackLine(lvlInit+i, numLastDirs)
-		if line == 0 && file == "." {
-			break
-		}
-		ret[i] = fmt.Sprintf("%s:%d", file, line)
-		ret[i] = Columnify(ret[i], 12, 12)
-	}
-	return ret
+// Show short source path as prefix for each log message
+func sourceLocationPrefix() string {
+	// line, file := stackLine(2, leadingDirsInPrefix) // me and call; but util.CheckErr needs 3
+	line, file := stackLine(sl.lvl, leadingDirsInPrefix)
+	prfx := fmt.Sprintf("%s:%d", file, line)
+	prfx = Columnify(prfx, 8, ColWidth)
+	return prfx
+}
+
+// For giving it to a tracer
+func Get() *log.Logger {
+	return l
+}
+
+// Enable default out writer
+func LogToStdOut() {
+	l.SetOutput(os.Stdout)
+}
+
+// Enable specific out writers (i.e. for multi writer)
+func LogTo(w io.Writer) {
+	l.SetOutput(w)
+}
+func Disable() {
+	l.SetOutput(ioutil.Discard)
+}
+
+func Fatalf(format string, v ...interface{}) {
+	payload := fmt.Sprintf(format, v...)
+	payload = fmt.Sprintf("%s%s%s\n", sourceLocationPrefix(), payload, SPrintStackTrace(2, 5, 2))
+	l.Print(payload)
+	panic(payload) // Hand the panic up to outer panic handler
+}
+
+// We need this to prevent % escaping
+func Fatal(v ...interface{}) {
+	payload := fmt.Sprint(v...) // only difference to Fatalf
+	payload = fmt.Sprintf("%s%s%s\n", sourceLocationPrefix(), payload, SPrintStackTrace(2, 5, 2))
+	l.Print(payload)
+	panic(payload) // Hand the panic up to outer panic handler
+}
+
+func Println(v ...interface{}) {
+	asSlice := []interface{}{sourceLocationPrefix()}
+	v = append(asSlice, v...)
+	l.Println(v...)
+}
+func Print(v ...interface{}) {
+	asSlice := []interface{}{sourceLocationPrefix()}
+	v = append(asSlice, v...)
+	l.Print(v...)
+}
+
+func Printf(format string, args ...interface{}) {
+	payload := fmt.Sprintf(format, args...)
+	payload = strings.TrimRight(payload, "\n")
+	payload = Columnify(payload, 56, 4)
+	payload = fmt.Sprintf("%s%s", sourceLocationPrefix(), payload)
+	l.Print(payload)
 }
 
 //
 func PrintStackTrace(args ...int) {
-	str := StackTraceStr(args...)
+	str := SPrintStackTrace(args...)
 	Printf(str)
 }
 
-// First  argument => level init
-// Second argument => levels up
-func StackTraceStr(args ...int) string {
+func SPrintStackTrace(args ...int) string {
+	lines := stackTrace(args...)
+	str := strings.Join(lines, "\n\t")
+	str = fmt.Sprintf("\n\t%v", str)
+	return str
+}
+
+// First  arg => level init
+// Second arg => levels up
+// Third  arg => dirs of before source file
+func stackTrace(args ...int) []string {
 
 	var (
-		lvlInit         = 2 // one for this func, one since direct caller is already logged in prefix
-		lvlsUp          = 4
-		numTrailingDirs = 2
+		lvlInit              = 2 // One for this func, one since direct caller is already logged in prefix
+		lvlsUp               = 4
+		dirsBeforeSourceFile = 2 // How many dirs are shown before the source file.
 	)
 
-	if len(args) > 0 && args[0] > 0 {
-		lvlInit = args[0]
+	if len(args) > 0 {
+		lvlInit += args[0]
 	}
 	if len(args) > 1 {
 		lvlsUp = args[1]
+	}
+	if len(args) > 2 {
+		dirsBeforeSourceFile = args[2]
 	}
 
 	lines := make([]string, lvlsUp)
@@ -172,39 +166,28 @@ func StackTraceStr(args ...int) string {
 		if line == 0 && file == "." {
 			break
 		}
-		file = LastXDirs(file, numTrailingDirs)
+		file = leadDirsBeforeSourceFile(file, dirsBeforeSourceFile)
 
 		lines[i] = fmt.Sprintf("%s:%d", file, line)
 		lines[i] = Columnify(lines[i], 12, 12)
 	}
-
-	linesStr := strings.Join(lines, "\n\t")
-	linesStr = fmt.Sprintf("\n\t%v", linesStr)
-	return linesStr
+	return lines
 }
 
-//
-// Under heavy load - with concurrent requests
-// the youngest request captures all log messages.
+// All log prints also appear in the http response
+func LogToResponseBody(w http.ResponseWriter) {
+	// file, err := os.Create("./01.log")
+	file, err := os.OpenFile("./01.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		panic("could not open log file")
+	}
 
-// func LogToResponseBody(c *iris.Context) {
+	if false {
+		w.Write([]byte("init"))
+	}
 
-// 	// file, err := os.Create("./01.log")
-// 	file, err := os.OpenFile("./01.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-// 	if err != nil {
-// 		panic("could not open log file")
-// 	}
-
-// 	if false {
-// 		wtr := bytes.NewBufferString("init")
-// 		c.WriteString(wtr.String())
-// 	}
-
-// 	bodyWtr := io.Writer(c.RequestCtx.Response.BodyWriter())
-// 	multi := io.MultiWriter(file, os.Stdout, bodyWtr)
-// 	multi = io.MultiWriter(file, os.Stdout)
-// 	SetOutput(multi)
-
-// 	c.Next()
-
-// }
+	bodyWtr := io.Writer(w)
+	multi := io.MultiWriter(file, os.Stdout, bodyWtr)
+	multi = io.MultiWriter(file, os.Stdout)
+	LogTo(multi)
+}
