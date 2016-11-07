@@ -21,5 +21,6 @@ func Debugf(req *http.Request, format string, args ...interface{}) {
 		p = p[strings.Index(p, "/"):]
 	}
 	format = Columnify(p, 12, 4) + format
+	defer SL().Incr().Decr()
 	Printf(format, args...)
 }
