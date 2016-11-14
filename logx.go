@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -16,13 +17,30 @@ const leadingDirsInPrefix = 2 // how many directories to display in prefix
 
 const ColWidth = 6 // default column width
 
-// var l = log.New(os.Stdout, "lx ", log.Lshortfile)
-var l = log.New(os.Stdout, "", log.Lshortfile)
+// os.Stderr is important for app engine
+var l = log.New(os.Stderr, "", log.Lshortfile)
 
 func init() {
 	l.SetFlags(log.Ltime | log.Lshortfile)
 	l.SetFlags(log.Lshortfile)
 	l.SetFlags(0)
+}
+
+// Returns the the source file.
+// Good to read file inside libaries,
+// completely independent of working dir
+// or application dir.
+func PathToSourceFile(levelsUp ...int) string {
+	lvlUp := 1
+	if len(levelsUp) > 0 {
+		lvlUp = 1 + levelsUp[0]
+	}
+	_, srcFile, _, ok := runtime.Caller(lvlUp)
+	if !ok {
+		Fatalf("runtime caller not found")
+	}
+	p := path.Dir(srcFile)
+	return p
 }
 
 const minCX = 2 // minimum spaces towards next columns
@@ -87,6 +105,7 @@ func LogToStdOut() {
 func LogTo(w io.Writer) {
 	l.SetOutput(w)
 }
+
 func Disable() {
 	l.SetOutput(ioutil.Discard)
 }
