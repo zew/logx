@@ -144,7 +144,7 @@ func Printf(format string, args ...interface{}) {
 	l.Print(payload)
 }
 
-//
+// see stackTrace()
 func PrintStackTrace(args ...int) {
 	str := SPrintStackTrace(args...)
 	Printf(str)
