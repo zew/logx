@@ -1,3 +1,10 @@
+// Package logx produces concise source code location paths;
+// paths to source files are reduced;
+// output is indented in discreet columns for readbility;
+// it also creates concise stacktraces;
+// Fatal() and Fatalf() panic instead of os.exit(),
+// giving http handler wrappers a chance to catch and display
+// the problem without blowing up the entire http server.
 package logx
 
 import (
@@ -13,21 +20,40 @@ import (
 	"strings"
 )
 
-const leadingDirsInPrefix = 2 // how many directories to display in prefix
+const (
+	leadingDirsInPrefix = 2 // how many directories to display in prefix
+	ColWidth            = 6 // default column width
+	minCX               = 2 // minimum spaces towards next columns
+)
 
-const ColWidth = 6 // default column width
-
+//
+// This packages wraps an underlying standard logger.
+// The funcs here ultimately use its Print() func.
 // os.Stderr is important for app engine
-var l = log.New(os.Stderr, "", log.Lshortfile)
+var l = log.New(os.Stderr, "", 0)
 
-func init() {
-	l.SetFlags(log.Ltime | log.Lshortfile)
-	l.SetFlags(log.Lshortfile)
-	l.SetFlags(0)
+// For giving it to a tracer.
+// Or to enable time and date logging.
+func Get() *log.Logger {
+	return l
 }
 
-// Returns the the source file.
-// Good to read file inside libaries,
+// Enable default out writer
+func LogToStdOut() {
+	l.SetOutput(os.Stdout)
+}
+
+// Enable specific out writers (i.e. for multi writer)
+func LogTo(w io.Writer) {
+	l.SetOutput(w)
+}
+
+func Disable() {
+	l.SetOutput(ioutil.Discard)
+}
+
+// Returns the the source file path.
+// Good to read file inside a library,
 // completely independent of working dir
 // or application dir.
 func PathToSourceFile(levelsUp ...int) string {
@@ -43,8 +69,8 @@ func PathToSourceFile(levelsUp ...int) string {
 	return p
 }
 
-const minCX = 2 // minimum spaces towards next columns
-
+// Function Columnify pads its argument with spaces.
+// The resulting length of arg is a multiple of colWidth.
 // Should go to package util strings -
 // but that causes import cycles
 func Columnify(arg string, minWidth, colWidth int) string {
@@ -75,8 +101,9 @@ func leadDirsBeforeSourceFile(path string, dirsBeforeSourceFile int) string {
 	return lastDirs
 }
 
-// Source code location
-// x steps up the call stack
+// Returns the source code location (line)
+// and the shortened path of the source code file
+// Param levelUp steps up the call stack
 func stackLine(levelUp, dirsBeforeSourceFile int) (int, string) {
 	_, file, line, _ := runtime.Caller(levelUp + 1) // plus one for myself-func
 	return line, leadDirsBeforeSourceFile(file, dirsBeforeSourceFile)
@@ -89,25 +116,6 @@ func sourceLocationPrefix() string {
 	prfx := fmt.Sprintf("%s:%d", file, line)
 	prfx = Columnify(prfx, 8, ColWidth)
 	return prfx
-}
-
-// For giving it to a tracer
-func Get() *log.Logger {
-	return l
-}
-
-// Enable default out writer
-func LogToStdOut() {
-	l.SetOutput(os.Stdout)
-}
-
-// Enable specific out writers (i.e. for multi writer)
-func LogTo(w io.Writer) {
-	l.SetOutput(w)
-}
-
-func Disable() {
-	l.SetOutput(ioutil.Discard)
 }
 
 func Fatalf(format string, v ...interface{}) {
@@ -163,7 +171,7 @@ func SPrintStackTrace(args ...int) string {
 func stackTrace(args ...int) []string {
 
 	var (
-		lvlInit              = 2 // One for this func, one since direct caller is already logged in prefix
+		lvlInit              = 2 // One for this func, one since direct caller is already logged in sourceLocationPrefix()
 		lvlsUp               = 4
 		dirsBeforeSourceFile = 2 // How many dirs are shown before the source file.
 	)
@@ -194,19 +202,9 @@ func stackTrace(args ...int) []string {
 }
 
 // All log prints also appear in the http response
+// Reverse at the end of request handler.
 func LogToResponseBody(w http.ResponseWriter) {
-	// file, err := os.Create("./01.log")
-	file, err := os.OpenFile("./01.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-	if err != nil {
-		panic("could not open log file")
-	}
-
-	if false {
-		w.Write([]byte("init"))
-	}
-
 	bodyWtr := io.Writer(w)
-	multi := io.MultiWriter(file, os.Stdout, bodyWtr)
-	multi = io.MultiWriter(file, os.Stdout)
+	multi := io.MultiWriter(os.Stdout, bodyWtr)
 	LogTo(multi)
 }
