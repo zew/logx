@@ -4,7 +4,9 @@
 // it also creates concise stacktraces;
 // Fatal() and Fatalf() panic instead of os.exit(),
 // giving http handler wrappers a chance to catch and display
-// the problem without blowing up the entire http server.
+// the problem without blowing up the entire http server;
+// Debugf(req,...) adds the request path to the log entry;
+// it can be *exchanged* for the standard lib log package by aliasing.
 package logx
 
 import (
@@ -50,6 +52,16 @@ func LogTo(w io.Writer) {
 
 func Disable() {
 	l.SetOutput(ioutil.Discard)
+}
+
+// This is just to make the package echangeable for standard lib log
+const Lshortfile = log.Lshortfile
+const Llongfile = log.Llongfile
+const Ldate = log.Ldate
+const Ltime = log.Ltime
+
+func SetFlags(flag int) {
+	l.SetFlags(flag)
 }
 
 // Returns the the source file path.
